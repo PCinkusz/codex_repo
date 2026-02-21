@@ -1,144 +1,92 @@
-const DEFAULTS = {
-  provider: "openrouter",
-  endpoint: "https://openrouter.ai/api/v1/chat/completions",
-  model: "meta-llama/llama-3.1-8b-instruct:free"
-};
+const DEFAULT_MODEL = "gpt-4o-mini";
 
-function buildPrompts({ prompt, currentState }) {
-  const systemPrompt = `You generate live frontend patches. Reply with JSON only: {"html":"...","css":"...","js":"...","explanation":"..."}.
+async function callAiProvider(input) {
+  const {
+    prompt,
+    currentState,
+    endpoint,
+    apiKey,
+    model = DEFAULT_MODEL
+  } = input;
+
+  if (!endpoint || !apiKey) {
+    return { ok: false, error: "Uzupełnij endpoint i klucz API w ustawieniach." };
+  }
+
+  const systemPrompt = `You are a senior front-end assistant. Return only JSON with keys: html, css, js, explanation.
 Rules:
-- html: snippet to inject into extension container.
-- css: style changes for snippet/page.
-- js: optional, safe browser code. Avoid external scripts.
-- explanation: short Polish sentence.
-No markdown. No code fences.`;
+- html: snippet to inject into page container.
+- css: styles for the snippet and page-level tweaks if needed.
+- js: optional enhancement code. Should be safe and small.
+- explanation: one short sentence in Polish.
+No markdown, no code fences.`;
 
-  const userPrompt = `Aktualny stan modyfikacji:\nHTML:\n${currentState?.html || ""}\n\nCSS:\n${currentState?.css || ""}\n\nJS:\n${currentState?.js || ""}\n\nPolecenie:\n${prompt}`;
+  const userPrompt = `Aktualny stan:
+HTML:\n${currentState.html || ""}\n
+CSS:\n${currentState.css || ""}\n
+JS:\n${currentState.js || ""}\n
+Polecenie użytkownika:\n${prompt}`;
 
-  return { systemPrompt, userPrompt };
-}
-
-function parsePatchFromText(rawText) {
-  let parsed;
   try {
-    parsed = JSON.parse(rawText);
-  } catch (_error) {
-    const maybeJson = rawText.match(/\{[\s\S]*\}/);
-    if (!maybeJson) {
-      throw new Error("Model nie zwrócił poprawnego JSON.");
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        temperature: 0.3
+      })
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      return { ok: false, error: `Błąd API: ${response.status} ${text}` };
     }
-    parsed = JSON.parse(maybeJson[0]);
-  }
 
-  return {
-    html: typeof parsed.html === "string" ? parsed.html : "",
-    css: typeof parsed.css === "string" ? parsed.css : "",
-    js: typeof parsed.js === "string" ? parsed.js : "",
-    explanation: typeof parsed.explanation === "string" ? parsed.explanation : "Wygenerowano patch."
-  };
-}
+    const data = await response.json();
+    const content = data?.choices?.[0]?.message?.content;
 
-async function callOpenAiCompatible({ endpoint, apiKey, model, systemPrompt, userPrompt }) {
-  if (!apiKey) {
-    return { ok: false, error: "Dla tego providera wymagany jest API key." };
-  }
+    if (!content) {
+      return { ok: false, error: "Model nie zwrócił treści." };
+    }
 
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`
-    },
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt }
-      ],
-      temperature: 0.2
-    })
-  });
-
-  if (!response.ok) {
-    throw new Error(`Błąd API: ${response.status} ${await response.text()}`);
-  }
-
-  const data = await response.json();
-  const content = data?.choices?.[0]?.message?.content;
-  if (!content) {
-    throw new Error("Brak treści w odpowiedzi modelu.");
-  }
-
-  return { ok: true, rawText: content };
-}
-
-async function callOllama({ endpoint, model, systemPrompt, userPrompt }) {
-  const chatEndpoint = endpoint || "http://127.0.0.1:11434/api/chat";
-  const response = await fetch(chatEndpoint, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: model || "qwen2.5-coder:7b",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt }
-      ],
-      stream: false,
-      options: {
-        temperature: 0.2
+    let parsed;
+    try {
+      parsed = JSON.parse(content);
+    } catch (_error) {
+      const maybeJson = content.match(/\{[\s\S]*\}/);
+      if (!maybeJson) {
+        return { ok: false, error: "Nie udało się sparsować JSON z odpowiedzi modelu." };
       }
-    })
-  });
-
-  if (!response.ok) {
-    throw new Error(`Błąd Ollama: ${response.status} ${await response.text()}`);
-  }
-
-  const data = await response.json();
-  const content = data?.message?.content;
-  if (!content) {
-    throw new Error("Brak treści z Ollama.");
-  }
-
-  return { ok: true, rawText: content };
-}
-
-async function generatePatch(input) {
-  const provider = input.provider || DEFAULTS.provider;
-  const endpoint = (input.endpoint || DEFAULTS.endpoint).trim();
-  const model = (input.model || DEFAULTS.model).trim();
-  const apiKey = (input.apiKey || "").trim();
-  const { systemPrompt, userPrompt } = buildPrompts(input);
-
-  try {
-    let result;
-    if (provider === "ollama") {
-      result = await callOllama({ endpoint, model, systemPrompt, userPrompt });
-    } else {
-      result = await callOpenAiCompatible({ endpoint, apiKey, model, systemPrompt, userPrompt });
+      parsed = JSON.parse(maybeJson[0]);
     }
 
-    const patch = parsePatchFromText(result.rawText);
     return {
       ok: true,
       patch: {
-        html: patch.html,
-        css: patch.css,
-        js: patch.js
+        html: parsed.html || "",
+        css: parsed.css || "",
+        js: parsed.js || ""
       },
-      explanation: patch.explanation
+      explanation: parsed.explanation || "Wygenerowano modyfikację."
     };
   } catch (error) {
     return {
       ok: false,
-      error: `AI error: ${String(error.message || error)}`
+      error: `Błąd połączenia: ${String(error)}`
     };
   }
 }
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === "OLF_AI_GENERATE") {
-    generatePatch(message.payload || {}).then(sendResponse);
+    callAiProvider(message.payload).then(sendResponse);
     return true;
   }
 });

@@ -10,17 +10,12 @@
     <main class="app">
       <header class="hero">
         <h1>Organic Live Forge</h1>
-        <p>AI robi kod za Ciebie: prompt → patch → efekt na stronie.</p>
+        <p>Live patching HTML/CSS/JS + prompt AI</p>
       </header>
 
       <section class="card">
         <label for="aiPrompt">Prompt AI</label>
-        <textarea id="aiPrompt" placeholder="Np. Dodaj sticky CTA z animacją hover i obsługą kliknięcia."></textarea>
-        <div class="chips" id="chips">
-          <button type="button" class="chip" data-prompt="Dodaj nowoczesny hero section z CTA i subtelną animacją.">Hero + CTA</button>
-          <button type="button" class="chip" data-prompt="Dodaj pływający przycisk kontaktu w prawym dolnym rogu.">Floating button</button>
-          <button type="button" class="chip" data-prompt="Zmień wygląd strony na styl glassmorphism.">Glassmorphism</button>
-        </div>
+        <textarea id="aiPrompt" placeholder="Np. Dodaj pływający przycisk kontaktu w prawym dolnym rogu."></textarea>
         <div class="row">
           <button id="generateBtn" class="primary">Generuj i zastosuj</button>
         </div>
@@ -38,29 +33,21 @@
       </section>
 
       <section class="row split">
-        <button id="applyBtn" class="primary">Zastosuj ręcznie</button>
+        <button id="applyBtn" class="primary">Zastosuj</button>
         <button id="resetBtn">Reset</button>
       </section>
 
-      <details class="card settings" open>
-        <summary>Ustawienia AI (kluczowe)</summary>
-
-        <label for="providerInput">Provider</label>
-        <select id="providerInput">
-          <option value="openrouter">OpenRouter (free modele, wymaga API key)</option>
-          <option value="ollama">Ollama local (bez API key)</option>
-        </select>
-
-        <label for="endpointInput">Endpoint</label>
-        <input id="endpointInput" type="url" />
+      <details class="card settings">
+        <summary>Ustawienia AI</summary>
+        <label for="endpointInput">Endpoint (OpenAI-compatible /chat/completions)</label>
+        <input id="endpointInput" type="url" placeholder="https://api.openai.com/v1/chat/completions" />
 
         <label for="modelInput">Model</label>
-        <input id="modelInput" type="text" />
+        <input id="modelInput" type="text" placeholder="gpt-4o-mini" />
 
-        <label for="apiKeyInput">API Key (zostaw puste dla Ollama)</label>
-        <input id="apiKeyInput" type="password" placeholder="wklej tutaj" />
+        <label for="apiKeyInput">API Key</label>
+        <input id="apiKeyInput" type="password" placeholder="sk-..." />
 
-        <p class="hint" id="providerHint"></p>
         <button id="saveSettingsBtn">Zapisz ustawienia</button>
       </details>
 

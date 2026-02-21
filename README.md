@@ -1,74 +1,81 @@
 # Organic Live Forge (Chrome Extension)
 
-Wtyczka do szybkiego, lokalnego prototypowania UI na stronie: **AI pisze HTML/CSS/JS za Ciebie i od razu aplikuje efekt**.
+Wtyczka do szybkiego, lokalnego prototypowania UI i zachowania strony bez przebudowy projektu.
 
-## Dlaczego to jest szybkie
+## Co robi
 
-- Nie przebudowujesz projektu.
-- Nie robisz deploya.
-- Nie przełączasz się między narzędziami.
-- Prompt → kod → widoczny efekt na otwartej stronie.
+- Modyfikuje **HTML, CSS i JavaScript** na aktualnie otwartej karcie.
+- Działa w trybie **live**: kliknięcie „Zastosuj” od razu pokazuje efekt na stronie.
+- Ma pole „Prompt AI”, które generuje patch (`html`, `css`, `js`) i automatycznie go aplikuje.
+- Pozwala wyczyścić zmiany przyciskiem „Reset”.
 
-## Najważniejsze: AI jako domyślna ścieżka
+## Jak to działa (architektura)
 
-Masz dwa tryby AI:
+### 1) `content_script` – silnik zmian na stronie
 
-1. **OpenRouter (free modele)**
-   - Domyślny endpoint: `https://openrouter.ai/api/v1/chat/completions`
-   - Domyślny model: `meta-llama/llama-3.1-8b-instruct:free`
-   - Wymaga API key (wklejany w popupie).
+Plik: `content/content-script.js`
 
-2. **Ollama local (bez API key)**
-   - Domyślny endpoint: `http://127.0.0.1:11434/api/chat`
-   - Domyślny model: `qwen2.5-coder:7b`
-   - Działa lokalnie, jeśli masz uruchomioną Ollama.
+- Utrzymuje stan patcha (`css`, `html`, `js`) per karta.
+- Wstrzykuje:
+  - `<style data-organic-live-forge="css">` do `documentElement` dla CSS,
+  - kontener `<div data-organic-live-forge="html">` do `body` dla HTML.
+- Uruchamia kod JS przez `new Function(...)` i wspiera cleanup (API `onCleanup`).
 
-## Jak działa architektura
+### 2) Popup – minimalistyczne „organic UI”
 
-### 1) Content script (`content/content-script.js`)
+Pliki: `popup/popup.html`, `popup/popup.css`, `popup/popup.js`
 
-- Trzyma stan patcha (`html`, `css`, `js`) na karcie.
-- Wstrzykuje CSS do `<style data-organic-live-forge="css">`.
-- Wstrzykuje HTML do kontenera `<div data-organic-live-forge="html">`.
-- Uruchamia JS i wspiera cleanup między kolejnymi patchami.
+- Ciemny, miękki interfejs z zielonym akcentem i zaokrągleniami.
+- Sekcje:
+  - Prompt AI,
+  - ręczne pola HTML/CSS/JS,
+  - przyciski „Zastosuj”/„Reset”,
+  - ustawienia API (endpoint, model, key).
+- Komunikuje się z aktywną kartą przez `chrome.tabs.sendMessage`.
 
-### 2) Popup UI (`popup/*`)
+### 3) Service Worker – integracja AI
 
-- Pole promptu AI + gotowe szybkie „chipsy” promptów.
-- Edytory HTML/CSS/JS (na wypadek ręcznej korekty).
-- Przyciski:
-  - **Generuj i zastosuj** (najważniejszy workflow),
-  - **Zastosuj ręcznie**,
-  - **Reset**.
-- Ustawienia AI:
-  - wybór providera,
-  - endpoint,
-  - model,
-  - API key.
+Plik: `background/service-worker.js`
 
-### 3) Service worker (`background/service-worker.js`)
+- Odbiera żądanie `OLF_AI_GENERATE` z popupu.
+- Wysyła request do endpointu OpenAI-compatible `/chat/completions`.
+- Wymusza zwrot czystego JSON z kluczami:
+  - `html`, `css`, `js`, `explanation`.
+- Zwraca gotowy patch do popupu, który aplikuje go na stronie.
 
-- Obsługuje generację AI przez `OLF_AI_GENERATE`.
-- Ma adapter dla OpenAI-compatible endpointów i osobny adapter dla Ollama.
-- Wymusza odpowiedź modelu jako JSON: `html`, `css`, `js`, `explanation`.
+## Minimalistyczny design UI (założenia)
 
-## Instalacja
+- **Organic, low-friction**: jedna kolumna, krótkie ścieżki, minimum kliknięć.
+- **Natychmiastowy feedback**: status pod przyciskami.
+- **Dual mode**:
+  1. ręczna edycja (dev kontroluje kod),
+  2. AI prompt (szybki prototyp).
+- **Bez lock-in**: endpoint i model konfigurowalne.
 
-1. Wejdź na `chrome://extensions/`
+## Wymagania techniczne
+
+- Chrome (Manifest V3).
+- Uprawnienia:
+  - `activeTab`, `scripting`, `storage`,
+  - `host_permissions: <all_urls>`.
+- Dla funkcji AI: API key i endpoint kompatybilny z OpenAI chat completions.
+
+## Instalacja lokalna
+
+1. Otwórz `chrome://extensions/`
 2. Włącz „Developer mode”.
 3. Kliknij „Load unpacked”.
-4. Wskaż folder repo.
+4. Wskaż katalog repo (`/workspace/codex_repo`).
 
-## Użycie (zalecane)
+## Użycie
 
-1. Otwórz swoją stronę deweloperską.
-2. Otwórz popup rozszerzenia.
-3. W sekcji AI wybierz provider (OpenRouter lub Ollama).
-4. Wpisz prompt.
-5. Kliknij **Generuj i zastosuj**.
-6. Jeśli efekt jest prawie dobry, popraw drobiazgi ręcznie i kliknij **Zastosuj ręcznie**.
+1. Wejdź na swoją stronę deweloperską.
+2. Otwórz popup „Organic Live Forge”.
+3. Wklej ręcznie HTML/CSS/JS i kliknij **Zastosuj** – albo wpisz prompt i kliknij **Generuj i zastosuj**.
+4. Gdy skończysz eksperyment, kliknij **Reset**.
 
-## Bezpieczeństwo / ograniczenia
+## Bezpieczeństwo i ograniczenia
 
-- AI generuje i uruchamia JS na stronie — używaj zaufanych promptów.
-- To narzędzie do prototypowania i szybkich iteracji, nie zastępuje docelowego review kodu.
+- Kod JS uruchamiany przez wtyczkę wykonuje się na stronie – używaj tylko zaufanych promptów i źródeł.
+- Strony z restrykcyjnym CSP lub specyficzną strukturą DOM mogą wymagać dostosowania.
+- To narzędzie do szybkiego prototypowania; nie zastępuje review i commitów w repo aplikacji docelowej.
