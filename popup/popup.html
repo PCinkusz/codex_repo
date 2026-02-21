@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Organic Live Forge</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header class="hero">
+        <h1>Organic Live Forge</h1>
+        <p>Live patching HTML/CSS/JS + prompt AI</p>
+      </header>
+
+      <section class="card">
+        <label for="aiPrompt">Prompt AI</label>
+        <textarea id="aiPrompt" placeholder="Np. Dodaj pływający przycisk kontaktu w prawym dolnym rogu."></textarea>
+        <div class="row">
+          <button id="generateBtn" class="primary">Generuj i zastosuj</button>
+        </div>
+      </section>
+
+      <section class="grid">
+        <label for="htmlInput">HTML</label>
+        <textarea id="htmlInput" class="code"></textarea>
+
+        <label for="cssInput">CSS</label>
+        <textarea id="cssInput" class="code"></textarea>
+
+        <label for="jsInput">JavaScript</label>
+        <textarea id="jsInput" class="code"></textarea>
+      </section>
+
+      <section class="row split">
+        <button id="applyBtn" class="primary">Zastosuj</button>
+        <button id="resetBtn">Reset</button>
+      </section>
+
+      <details class="card settings">
+        <summary>Ustawienia AI</summary>
+        <label for="endpointInput">Endpoint (OpenAI-compatible /chat/completions)</label>
+        <input id="endpointInput" type="url" placeholder="https://api.openai.com/v1/chat/completions" />
+
+        <label for="modelInput">Model</label>
+        <input id="modelInput" type="text" placeholder="gpt-4o-mini" />
+
+        <label for="apiKeyInput">API Key</label>
+        <input id="apiKeyInput" type="password" placeholder="sk-..." />
+
+        <button id="saveSettingsBtn">Zapisz ustawienia</button>
+      </details>
+
+      <p id="status" class="status"></p>
+    </main>
+
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>
